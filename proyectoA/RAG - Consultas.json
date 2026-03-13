@@ -1,0 +1,255 @@
+{
+  "name": "RAG - Consultas",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "consulta",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook Consulta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1d1c084b-4c13-4551-81e3-1c04a4d2d12a",
+      "webhookId": "4cee9a76-5553-4d6d-8446-98878a97c1e7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nomic-embed-text\",\n  \"prompt\": \"{{ $node[\"Webhook Consulta\"].json[\"body\"][\"pregunta\"] }}\"\n}",
+        "options": {}
+      },
+      "name": "Ollama Embed Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        256,
+        0
+      ],
+      "id": "e0f4cc1e-5ec9-48a0-9821-fc448ceaa32a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:6333/collections/documentos_rag/points/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n{\n  \"vector\": $json.embedding,\n  \"limit\": 3,\n  \"with_payload\": true\n}\n}}",
+        "options": {}
+      },
+      "name": "Qdrant Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        512,
+        0
+      ],
+      "id": "44af739a-f136-4eff-a624-bd9482b2d46d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"model\": \"llama3\", \n  \"prompt\": \"Contexto: \" + $node[\"Qdrant Search\"].json.result.map(r => r.payload.texto).join(\" \") + \"\\n\\nPregunta: \" + $node[\"Webhook Consulta\"].json.body.pregunta + \"\\n\\nResponde en español basándote solo en el contexto.\",\n  \"stream\": false\n}\n}}",
+        "options": {}
+      },
+      "name": "Ollama Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        752,
+        0
+      ],
+      "id": "f2d4b476-3b56-447e-a3ee-b25948a83fee"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "=consultas_rag",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "pregunta": "={{ $('Webhook Consulta').item.json.body.pregunta }}",
+            "respuesta": "={{ $json.response }}",
+            "documentos_usados": "={{ [\"documento_informativo.pdf\"] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "pregunta",
+              "displayName": "pregunta",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "respuesta",
+              "displayName": "respuesta",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "documentos_usados",
+              "displayName": "documentos_usados",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        0
+      ],
+      "id": "ee792306-3418-4314-96dd-699c57591b34",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "cuI0a9Ejb4ya4gzF",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $node[\"Ollama Answer\"].json.response }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "3a46e50c-f16a-4195-b91d-cb84d9b61c23",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Consulta": {
+      "main": [
+        [
+          {
+            "node": "Ollama Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embed Query": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Search": {
+      "main": [
+        [
+          {
+            "node": "Ollama Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Answer": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "eaa4d9fb-a7fa-4234-b2cb-303cc1d7d5f0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a9dbdae481db161fd170bc1f95546555994daacb3d65c4c44c5cfe30867e186"
+  },
+  "id": "IJOPExB6R9RNVq2xko_An",
+  "tags": []
+}

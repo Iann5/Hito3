@@ -1,0 +1,248 @@
+{
+  "name": "RAG - Ingesta",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingesta",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook Ingesta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d87cf6dd-b6b8-4ce8-a2e2-18afa833458c",
+      "webhookId": "295470c0-78d1-42fb-961a-8c6fdaf9c016"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "file",
+        "options": {}
+      },
+      "name": "Extraer PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "de39f4f6-1522-4969-b1c5-4813929dbaaa"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.text;\nconst words = text.split(/\\s+/);\nconst chunkSize = 500;\nconst overlap = 50;\nlet chunks = [];\n\n// Accedemos al nombre del archivo de forma más directa\nconst fileName = $('Webhook Ingesta').item.binary.file.fileName;\n\nfor (let i = 0; i < words.length; i += chunkSize - overlap) {\n    chunks.push({\n        chunk: words.slice(i, i + chunkSize).join(\" \"),\n        nombre_archivo: fileName,\n        total_chunks: Math.ceil(words.length / (chunkSize - overlap))\n    });\n}\n\nreturn chunks.map(c => ({ json: c }));"
+      },
+      "name": "Dividir en Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "db5d02b8-cf47-4c78-b99e-b1cebfe2608f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nomic-embed-text\",\n  \"prompt\": {{ JSON.stringify($json.chunk) }}\n}",
+        "options": {}
+      },
+      "name": "Ollama Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        608,
+        0
+      ],
+      "id": "5513c5d5-bb65-4d21-b8d2-0da247f613bc"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://host.docker.internal:6333/collections/documentos_rag/points",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"points\": [\n    {\n      \"id\": {{ Math.floor(Math.random() * 9999999) + 1 }},\n      \"vector\": {{ JSON.stringify($json.embedding) }},\n      \"payload\": {\n        \"texto\": {{ JSON.stringify($('Dividir en Chunks').item.json.chunk) }}\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "name": "Qdrant Vector Store",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        800,
+        0
+      ],
+      "id": "bd510a11-a32d-462b-abae-ef35bf641754"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "documentos",
+          "mode": "list",
+          "cachedResultName": "documentos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nombre": "={{ $node[\"Dividir en Chunks\"].json[\"nombre_archivo\"] }}",
+            "ruta_archivo": "Subida Webhook",
+            "num_chunks": "={{ $node[\"Dividir en Chunks\"].json[\"total_chunks\"] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ruta_archivo",
+              "displayName": "ruta_archivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "num_chunks",
+              "displayName": "num_chunks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_procesado",
+              "displayName": "fecha_procesado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "51230907-f202-4b30-b28d-9f4fec7b5292",
+      "name": "Insert rows in a table",
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "cuI0a9Ejb4ya4gzF",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Ingesta": {
+      "main": [
+        [
+          {
+            "node": "Extraer PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer PDF": {
+      "main": [
+        [
+          {
+            "node": "Dividir en Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dividir en Chunks": {
+      "main": [
+        [
+          {
+            "node": "Ollama Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "60233972-b780-48d8-b074-90f1bc337515",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a9dbdae481db161fd170bc1f95546555994daacb3d65c4c44c5cfe30867e186"
+  },
+  "id": "6mNJZed-BgtZhUtLqWlgB",
+  "tags": []
+}
