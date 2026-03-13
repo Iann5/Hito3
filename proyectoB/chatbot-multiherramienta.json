@@ -1,0 +1,875 @@
+{
+  "name": "chatbot-multiherramienta",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        192
+      ],
+      "id": "92772584-4fc8-404e-89eb-9d1f968d929a",
+      "webhookId": "186a117b-087b-475d-98f1-01cb1142ab5f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"phi\",\n  \"prompt\": \"### Instruction:\\nYou are a strict intent classifier. Read the User Message and reply with EXACTLY ONE WORD from this list: [clima, pais, wiki, chiste].\\n- If the message asks about weather or temperature, reply: clima\\n- If the message asks about a country or geography, reply: pais\\n- If the message asks to search Wikipedia, reply: wiki\\n- If the message asks for a joke, reply: chiste\\n\\n### User Message:\\n{{$json.body.mensaje}}\\n\\n### Response:\\n\",\n  \"stream\": false,\n  \"options\": {\n    \"temperature\": 0\n  }\n}",
+        "options": {}
+      },
+      "name": "Ollama Analiza Intención",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -720,
+        192
+      ],
+      "id": "9ef94223-935a-4bef-9b67-e405b8aa35d9"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.response.toLowerCase() }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "contains",
+              "value2": "clima"
+            },
+            {
+              "operation": "contains",
+              "value2": "pais",
+              "output": 1
+            },
+            {
+              "operation": "contains",
+              "value2": "wiki",
+              "output": 2
+            },
+            {
+              "operation": "contains",
+              "value2": "chiste",
+              "output": 3
+            }
+          ]
+        },
+        "fallbackOutput": 0
+      },
+      "name": "Switch Herramientas",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        160
+      ],
+      "id": "b2d21668-35b4-4c1b-aea0-2ec7b8878529"
+    },
+    {
+      "parameters": {
+        "url": "https://v2.jokeapi.dev/joke/Any?lang=es&type=single",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        400
+      ],
+      "name": "HTTP Request",
+      "id": "c52181de-a9fa-459e-8e2e-47c185dc08eb"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "historial_chat",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mensaje_usuario": "={{ $('Webhook').item.json.body.mensaje }}",
+            "intencion_detectada": "chiste",
+            "herramienta_usada": "JokeAPI",
+            "respuesta_bot": "={{ $json.joke }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mensaje_usuario",
+              "displayName": "mensaje_usuario",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "intencion_detectada",
+              "displayName": "intencion_detectada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "herramienta_usada",
+              "displayName": "herramienta_usada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "respuesta_bot",
+              "displayName": "respuesta_bot",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        400
+      ],
+      "name": "Insert rows in a table",
+      "id": "21709b2f-1a99-4566-b009-c46be1dd1986",
+      "credentials": {
+        "postgres": {
+          "id": "WmfiKOY9VhPM5ZBK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('HTTP Request').item.json.joke }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        192,
+        400
+      ],
+      "name": "Respond to Webhook",
+      "id": "b7f23c2b-3248-4c6b-acf8-bf29f7484f0c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"phi\",\n  \"prompt\": \"Extract ONLY the city name from the following text. Output only the city name. NO punctuation.\\nText: {{$('Webhook').item.json.body.mensaje}}\\nCity:\",\n  \"stream\": false,\n  \"options\": {\n    \"temperature\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        -80
+      ],
+      "name": "HTTP Request1",
+      "id": "d2562c9b-8889-474f-89bf-b170be1c3acb"
+    },
+    {
+      "parameters": {
+        "url": "=https://geocoding-api.open-meteo.com/v1/search?name={{encodeURI($json.response.replace('City:', '').trim())}}&count=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        0,
+        -80
+      ],
+      "name": "HTTP Request2",
+      "id": "ad6cce2f-79f8-4d8a-84ee-639092641421"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.open-meteo.com/v1/forecast?latitude={{ $json.results[0].latitude }}&longitude={{ $json.results[0].longitude }}&current_weather=true",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        192,
+        -80
+      ],
+      "name": "HTTP Request3",
+      "id": "c53251ca-03c9-4df6-adad-a99fc8ac93f7"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "historial_chat",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mensaje_usuario": "={{ $('Webhook').item.json.body.mensaje }}",
+            "intencion_detectada": "clima",
+            "herramienta_usada": "OpenMeteo",
+            "respuesta_bot": "=En {{ $('HTTP Request1').item.json.response.replace('City:', '').trim() }} hace {{ $json.current_weather.temperature }}°C"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mensaje_usuario",
+              "displayName": "mensaje_usuario",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "intencion_detectada",
+              "displayName": "intencion_detectada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "herramienta_usada",
+              "displayName": "herramienta_usada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "respuesta_bot",
+              "displayName": "respuesta_bot",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        384,
+        -80
+      ],
+      "name": "Insert rows in a table1",
+      "id": "0c5d6396-3a4d-4ac5-aec4-7e0e0aebdd16",
+      "credentials": {
+        "postgres": {
+          "id": "WmfiKOY9VhPM5ZBK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=En {{ $('HTTP Request1').item.json.response.replace('City:', '').trim() }} hace {{ $('HTTP Request3').item.json.current_weather.temperature }}°C",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        576,
+        -80
+      ],
+      "name": "Respond to Webhook1",
+      "id": "b8e44599-d992-4a16-b783-c2baab87414e"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"phi\",\n  \"prompt\": \"Extract ONLY the country name from the text. NO punctuation. NO extra words.\\nText: {{$('Webhook').item.json.body.mensaje}}\\nCountry:\",\n  \"stream\": false,\n  \"options\": {\n    \"temperature\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        80
+      ],
+      "name": "HTTP Request4",
+      "id": "12f9172b-036b-4375-a582-eff699516073"
+    },
+    {
+      "parameters": {
+        "url": "=https://restcountries.com/v3.1/name/{{ encodeURI($json.response.replace('Country:', '').replace('.', '').trim()) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        0,
+        80
+      ],
+      "name": "HTTP Request5",
+      "id": "3a2dfcb1-9f33-4c98-9088-5b2807237a6c"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "historial_chat",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mensaje_usuario": "={{ $('Webhook').item.json.body.mensaje }}",
+            "intencion_detectada": "pais",
+            "herramienta_usada": "REST Countries",
+            "respuesta_bot": "=La capital es {{ $json[0].capital[0] }} y tiene {{ $json[0].population }} habitantes."
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mensaje_usuario",
+              "displayName": "mensaje_usuario",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "intencion_detectada",
+              "displayName": "intencion_detectada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "herramienta_usada",
+              "displayName": "herramienta_usada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "respuesta_bot",
+              "displayName": "respuesta_bot",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        192,
+        80
+      ],
+      "name": "Insert rows in a table2",
+      "id": "95b5d6ca-61e1-4c9c-a3dc-2484e518fb21",
+      "credentials": {
+        "postgres": {
+          "id": "WmfiKOY9VhPM5ZBK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=La capital es {{ $('HTTP Request5').item.json[0].capital[0] }} y tiene {{ $('HTTP Request5').item.json[0].population }} habitantes.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        384,
+        80
+      ],
+      "name": "Respond to Webhook2",
+      "id": "ee5ed286-a8b9-4a04-b0ce-3188420799e3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot_ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"phi\",\n  \"prompt\": \"Extract ONLY the main search topic from the text. NO punctuation. NO extra words.\\nText: {{$('Webhook').item.json.body.mensaje}}\\nTopic:\",\n  \"stream\": false,\n  \"options\": {\n    \"temperature\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        240
+      ],
+      "name": "HTTP Request6",
+      "id": "3a39f125-73d2-48ea-ac84-737cf199c00c"
+    },
+    {
+      "parameters": {
+        "url": "=https://es.wikipedia.org/w/api.php?action=query&prop=extracts&exsentences=3&explaintext=1&format=json&redirects=1&titles={{ encodeURI($json.response.replace('Search Topic:', '').replace('Topic:', '').replace('.', '').trim()) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "MiChatbotN8n/1.0 (contacto@mipractica.com)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        0,
+        240
+      ],
+      "name": "HTTP Request7",
+      "id": "545be82d-1924-4f38-b648-19844179e6d4"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "historial_chat",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mensaje_usuario": "={{ $('Webhook').item.json.body.mensaje }}",
+            "intencion_detectada": "wikipedia",
+            "herramienta_usada": "Wikipedia API",
+            "respuesta_bot": "={{ Object.values($('HTTP Request7').item.json.query.pages)[0].extract || \"No se encontró el artículo en Wikipedia\" }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mensaje_usuario",
+              "displayName": "mensaje_usuario",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "intencion_detectada",
+              "displayName": "intencion_detectada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "herramienta_usada",
+              "displayName": "herramienta_usada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "respuesta_bot",
+              "displayName": "respuesta_bot",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        192,
+        240
+      ],
+      "name": "Insert rows in a table3",
+      "id": "c28bcf7c-2865-4760-bac6-ba7568a40b5a",
+      "credentials": {
+        "postgres": {
+          "id": "WmfiKOY9VhPM5ZBK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ Object.values($('HTTP Request7').item.json.query.pages)[0].extract }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        240
+      ],
+      "name": "Respond to Webhook3",
+      "id": "3608598a-f064-49cb-90a3-202be05f676b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Ollama Analiza Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Analiza Intención": {
+      "main": [
+        [
+          {
+            "node": "Switch Herramientas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Herramientas": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request5": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request6": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request7": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "668886ee-de8f-443a-bed5-e992c902b04c",
+  "meta": {
+    "instanceId": "8cb0c9963353d71d96663ee8efadd9e3388c686e4c872cdde31496f64875ce37"
+  },
+  "id": "G5gaypoVIgIszS8-sabWl",
+  "tags": []
+}

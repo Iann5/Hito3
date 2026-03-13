@@ -1,0 +1,69 @@
+### Pruebas del Chatbot Multiherramienta
+
+@baseUrl = http://localhost:5678/webhook/chat
+@sessionId = user-test-001
+
+### Test: Clima (Madrid)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "¿Qué tiempo hace en Madrid?"
+}
+
+###
+
+### Test: Clima (Barcelona)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "¿Cómo está el tiempo en Barcelona hoy?"
+}
+
+###
+
+### Test: Información de país
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "Cuéntame algo sobre Japón"
+}
+
+###
+
+### Test: Wikipedia
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "Busca en Wikipedia qué es la Inteligencia Artificial"
+}
+
+###
+
+### Test: chiste
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "Cuéntame un chiste de programación"
+}
+
+###
+
+### Test: Pregunta general
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+    "session_id": "{{sessionId}}",
+    "message": "¿Cuál es tu nombre y qué puedes hacer?"
+}
+
